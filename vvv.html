@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload Video</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 30px; }
+    #linkBox { margin-top: 20px; padding: 15px; background: #f0f0f0; display: none; }
+    input, button { padding: 10px; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <h1>📤 Video Upload කරන්න</h1>
+  <input type="file" id="videoFile" accept="video/*">
+  <br><br>
+  <button onclick="uploadVideo()">Upload & Get Link</button>
+  <div id="progress"></div>
+  <div id="linkBox">
+    <p>🔗 Share කරන්න පුළුවන් Link:</p>
+    <a id="generatedLink" href="#" target="_blank"></a>
+    <button onclick="copyLink()">Copy Link</button>
+  </div>
+
+  <!-- Firebase Compat SDK (namespaced) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    // ========== ඔබේ Firebase config එක මෙතන paste කරන්න ==========
+    const firebaseConfig = {
+      apiKey: "AIzaSyCp_IQVnoxPKHcpShm2nMQ6v1Dh0GmPTjA",
+  authDomain: "secretaryapp-b4d89.firebaseapp.com",
+  projectId: "secretaryapp-b4d89",
+  storageBucket: "secretaryapp-b4d89.firebasestorage.app",
+  messagingSenderId: "288327170368",
+  appId: "1:288327170368:web:d21ae8902bf6b63d79e2a5"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const storage = firebase.storage();
+    const db = firebase.firestore();
+
+    async function uploadVideo() {
+      const file = document.getElementById('videoFile').files[0];
+      if (!file) return alert("කරුණාකර video file එකක් select කරන්න!");
+
+      const progressDiv = document.getElementById('progress');
+      progressDiv.textContent = "Uploading... 0%";
+
+      // Firebase Storage path
+      const storageRef = storage.ref('videos/' + Date.now() + '-' + file.name);
+      const uploadTask = storageRef.put(file);
+
+      uploadTask.on('state_changed',
+        (snapshot) => {
+          const percent = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          progressDiv.textContent = `Uploading... ${Math.round(percent)}%`;
+        },
+        (error) => {
+          console.error(error);
+          alert("Upload failed! " + error.message);
+        },
+        async () => {
+          // Upload complete, get download URL
+          const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
+          progressDiv.textContent = "Upload done! Generating link...";
+
+          // Firestore එකට save කරන්න (unique ID auto generate වෙයි)
+          const docRef = await db.collection('videos').add({
+            videoUrl: downloadURL,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+
+          const videoId = docRef.id;
+          const watchLink = `${window.location.origin}/watch.html?id=${videoId}`;
+
+          document.getElementById('generatedLink').href = watchLink;
+          document.getElementById('generatedLink').textContent = watchLink;
+          document.getElementById('linkBox').style.display = 'block';
+          progressDiv.textContent = "Done ✅";
+        }
+      );
+    }
+
+    function copyLink() {
+      const link = document.getElementById('generatedLink').href;
+      navigator.clipboard.writeText(link).then(() => alert("Link copied!"));
+    }
+  </script>
+</body>
+</html>
